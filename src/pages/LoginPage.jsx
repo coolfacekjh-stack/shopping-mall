@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { signInWithPopup } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase/firebaseConfig';
 import {
   setUser,
@@ -40,8 +40,22 @@ function LoginPage() {
       );
       navigate('/', { replace: true });
     } catch (error) {
-      dispatch(setError(`에러코드: ${error.code}`));
-      console.error('구글 로그인 실패:', error.code, error.message);
+      if (
+        error.code === 'auth/popup-blocked' ||
+        error.code === 'auth/popup-closed-by-user' ||
+        error.code === 'auth/cancelled-popup-request'
+      ) {
+        // 팝업 차단 → 전체 페이지 리다이렉트로 fallback
+        // (이 경우 App.jsx의 getRedirectResult가 결과를 처리)
+        try {
+          await signInWithRedirect(auth, googleProvider);
+        } catch (redirectError) {
+          dispatch(setError(`리다이렉트 에러: ${redirectError.code}`));
+        }
+      } else {
+        dispatch(setError(`에러코드: ${error.code}`));
+        console.error('구글 로그인 실패:', error.code, error.message);
+      }
     }
   };
 
