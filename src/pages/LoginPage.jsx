@@ -1,10 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import {
-  signInWithPopup,
-  signInWithRedirect,
-} from 'firebase/auth';
+import { signInWithRedirect } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase/firebaseConfig';
 import {
   setError,
@@ -27,27 +24,14 @@ function LoginPage() {
     }
   }, [isLoggedIn, navigate]);
 
-  // 구글 로그인 처리 (팝업 → 차단 시 리다이렉트 fallback)
+  // 구글 로그인 — 리다이렉트 방식 (팝업 CSP 문제 우회)
   const handleGoogleLogin = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
-      // 성공 시 onAuthStateChanged → setUser → isLoggedIn = true → navigate('/')
+      await signInWithRedirect(auth, googleProvider);
+      // 구글 인증 후 앱으로 돌아오면 App.jsx의 getRedirectResult + onAuthStateChanged 처리
     } catch (error) {
-      if (
-        error.code === 'auth/popup-blocked' ||
-        error.code === 'auth/popup-closed-by-user' ||
-        error.code === 'auth/cancelled-popup-request'
-      ) {
-        // 팝업 차단 → 리다이렉트 방식으로 전환
-        try {
-          await signInWithRedirect(auth, googleProvider);
-        } catch (redirectError) {
-          dispatch(setError(redirectError.message));
-        }
-      } else {
-        dispatch(setError(error.message));
-        console.error('구글 로그인 실패:', error.code, error.message);
-      }
+      dispatch(setError(error.message));
+      console.error('구글 로그인 실패:', error.code, error.message);
     }
   };
 
