@@ -3,7 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 import { auth } from './firebase/firebaseConfig';
-import { setUser, clearUser, setLoading, setError } from './store/slices/authSlice';
+import { setUser, clearUser, setError } from './store/slices/authSlice';
 
 import Header from './components/common/Header';
 import Footer from './components/common/Footer';
@@ -20,39 +20,51 @@ function App() {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    // 리다이렉트 로그인 결과 처리 (signInWithRedirect 후 돌아왔을 때)
+    let unsubscribe = null;
+
+    // getRedirectResult 완료 후 onAuthStateChanged 구독
+    // → redirect 결과를 처리하기 전에 onAuthStateChanged가 null을 발동시키는 타이밍 버그 방지
     getRedirectResult(auth)
       .then((result) => {
         if (result?.user) {
           const u = result.user;
-          dispatch(setUser({
-            uid: u.uid,
-            displayName: u.displayName,
-            email: u.email,
-            photoURL: u.photoURL,
-          }));
+          dispatch(
+            setUser({
+              uid: u.uid,
+              displayName: u.displayName,
+              email: u.email,
+              photoURL: u.photoURL,
+            })
+          );
         }
       })
       .catch((err) => {
         console.error('getRedirectResult 오류:', err.code, err.message);
-        dispatch(setError(`리다이렉트 에러: ${err.code} / ${err.message}`));
+        if (err.code !== 'auth/no-auth-event') {
+          dispatch(setError(`리다이렉트 에러: ${err.code}`));
+        }
+      })
+      .finally(() => {
+        // redirect 결과 처리 완료 후 onAuthStateChanged 구독
+        unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+          if (firebaseUser) {
+            dispatch(
+              setUser({
+                uid: firebaseUser.uid,
+                displayName: firebaseUser.displayName,
+                email: firebaseUser.email,
+                photoURL: firebaseUser.photoURL,
+              })
+            );
+          } else {
+            dispatch(clearUser());
+          }
+        });
       });
 
-    // Firebase 인증 상태 변화 감지 (앱 전체에서 로그인 상태 유지)
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        dispatch(setUser({
-          uid: firebaseUser.uid,
-          displayName: firebaseUser.displayName,
-          email: firebaseUser.email,
-          photoURL: firebaseUser.photoURL,
-        }));
-      } else {
-        dispatch(clearUser());
-      }
-    });
-
-    return () => unsubscribe();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [dispatch]);
 
   return (
