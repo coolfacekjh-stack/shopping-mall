@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { signInWithRedirect } from 'firebase/auth';
+import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase/firebaseConfig';
 import {
+  setUser,
   setError,
   selectIsLoggedIn,
   selectAuthError,
@@ -17,21 +18,29 @@ function LoginPage() {
   const authError = useSelector(selectAuthError);
   const loading = useSelector(selectAuthLoading);
 
-  // 로그인 완료되면 홈으로 이동
+  // 이미 로그인 상태면 홈으로 이동
   useEffect(() => {
     if (isLoggedIn) {
       navigate('/', { replace: true });
     }
   }, [isLoggedIn, navigate]);
 
-  // 구글 로그인 — 리다이렉트 방식 (팝업 CSP 문제 우회)
+  // 구글 로그인 — 팝업 방식으로 직접 결과 처리
   const handleGoogleLogin = async () => {
     try {
-      await signInWithRedirect(auth, googleProvider);
-      // 구글 인증 후 앱으로 돌아오면 App.jsx의 getRedirectResult + onAuthStateChanged 처리
+      const result = await signInWithPopup(auth, googleProvider);
+      const u = result.user;
+      dispatch(
+        setUser({
+          uid: u.uid,
+          displayName: u.displayName,
+          email: u.email,
+          photoURL: u.photoURL,
+        })
+      );
+      navigate('/', { replace: true });
     } catch (error) {
-      // 에러 코드를 화면에 표시 (디버깅용)
-      dispatch(setError(`에러코드: ${error.code} / ${error.message}`));
+      dispatch(setError(`에러코드: ${error.code}`));
       console.error('구글 로그인 실패:', error.code, error.message);
     }
   };
@@ -53,7 +62,7 @@ function LoginPage() {
         <h1 style={styles.title}>🛍️ ShopMall</h1>
         <p style={styles.subtitle}>로그인하고 쇼핑을 시작하세요</p>
 
-        {/* 에러 메시지 — 실제 에러 코드 표시 (디버깅용) */}
+        {/* 에러 메시지 */}
         {authError && (
           <p style={styles.errorMsg}>⚠️ {authError}</p>
         )}
