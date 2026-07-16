@@ -30,7 +30,8 @@ function LoginPage() {
       await signInWithRedirect(auth, googleProvider);
       // 구글 인증 후 앱으로 돌아오면 App.jsx의 getRedirectResult + onAuthStateChanged 처리
     } catch (error) {
-      dispatch(setError(error.message));
+      // 에러 코드를 화면에 표시 (디버깅용)
+      dispatch(setError(`에러코드: ${error.code} / ${error.message}`));
       console.error('구글 로그인 실패:', error.code, error.message);
     }
   };
@@ -52,9 +53,9 @@ function LoginPage() {
         <h1 style={styles.title}>🛍️ ShopMall</h1>
         <p style={styles.subtitle}>로그인하고 쇼핑을 시작하세요</p>
 
-        {/* 에러 메시지 */}
+        {/* 에러 메시지 — 실제 에러 코드 표시 (디버깅용) */}
         {authError && (
-          <p style={styles.errorMsg}>⚠️ 로그인에 실패했습니다. 다시 시도해 주세요.</p>
+          <p style={styles.errorMsg}>⚠️ {authError}</p>
         )}
 
         {/* 구글 로그인 버튼 */}

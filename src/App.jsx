@@ -3,7 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 import { auth } from './firebase/firebaseConfig';
-import { setUser, clearUser, setLoading } from './store/slices/authSlice';
+import { setUser, clearUser, setLoading, setError } from './store/slices/authSlice';
 
 import Header from './components/common/Header';
 import Footer from './components/common/Footer';
@@ -34,7 +34,8 @@ function App() {
         }
       })
       .catch((err) => {
-        console.error('getRedirectResult 오류:', err.message);
+        console.error('getRedirectResult 오류:', err.code, err.message);
+        dispatch(setError(`리다이렉트 에러: ${err.code} / ${err.message}`));
       });
 
     // Firebase 인증 상태 변화 감지 (앱 전체에서 로그인 상태 유지)
