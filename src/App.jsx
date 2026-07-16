@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 import { auth } from './firebase/firebaseConfig';
-import { setUser, clearUser } from './store/slices/authSlice';
+import { setUser, clearUser, setLoading } from './store/slices/authSlice';
 
 import Header from './components/common/Header';
 import Footer from './components/common/Footer';
@@ -19,26 +19,38 @@ import NotFoundPage from './pages/NotFoundPage';
 function App() {
   const dispatch = useDispatch();
 
-  // Firebase 인증 상태 변화 감지 (앱 전체에서 로그인 상태 유지)
   useEffect(() => {
+    // 리다이렉트 로그인 결과 처리 (signInWithRedirect 후 돌아왔을 때)
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          const u = result.user;
+          dispatch(setUser({
+            uid: u.uid,
+            displayName: u.displayName,
+            email: u.email,
+            photoURL: u.photoURL,
+          }));
+        }
+      })
+      .catch((err) => {
+        console.error('getRedirectResult 오류:', err.message);
+      });
+
+    // Firebase 인증 상태 변화 감지 (앱 전체에서 로그인 상태 유지)
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        // 로그인 상태: Redux에 유저 정보 저장
-        dispatch(
-          setUser({
-            uid: firebaseUser.uid,
-            displayName: firebaseUser.displayName,
-            email: firebaseUser.email,
-            photoURL: firebaseUser.photoURL,
-          })
-        );
+        dispatch(setUser({
+          uid: firebaseUser.uid,
+          displayName: firebaseUser.displayName,
+          email: firebaseUser.email,
+          photoURL: firebaseUser.photoURL,
+        }));
       } else {
-        // 로그아웃 상태: Redux 유저 정보 초기화
         dispatch(clearUser());
       }
     });
 
-    // 컴포넌트 언마운트 시 구독 해제
     return () => unsubscribe();
   }, [dispatch]);
 

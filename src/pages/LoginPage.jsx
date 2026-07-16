@@ -4,15 +4,13 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   signInWithPopup,
   signInWithRedirect,
-  getRedirectResult,
 } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase/firebaseConfig';
 import {
-  setUser,
   setError,
-  setLoading,
   selectIsLoggedIn,
   selectAuthError,
+  selectAuthLoading,
 } from '../store/slices/authSlice';
 
 function LoginPage() {
@@ -20,63 +18,27 @@ function LoginPage() {
   const navigate = useNavigate();
   const isLoggedIn = useSelector(selectIsLoggedIn);
   const authError = useSelector(selectAuthError);
+  const loading = useSelector(selectAuthLoading);
 
-  // 이미 로그인된 상태면 홈으로 리다이렉트
+  // 로그인 완료되면 홈으로 이동
   useEffect(() => {
     if (isLoggedIn) {
-      navigate('/');
+      navigate('/', { replace: true });
     }
   }, [isLoggedIn, navigate]);
 
-  // 리다이렉트 후 돌아왔을 때 결과 처리
-  useEffect(() => {
-    dispatch(setLoading(true));
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result?.user) {
-          const firebaseUser = result.user;
-          dispatch(
-            setUser({
-              uid: firebaseUser.uid,
-              displayName: firebaseUser.displayName,
-              email: firebaseUser.email,
-              photoURL: firebaseUser.photoURL,
-            })
-          );
-          navigate('/');
-        } else {
-          dispatch(setLoading(false));
-        }
-      })
-      .catch((error) => {
-        dispatch(setError(error.message));
-        console.error('리다이렉트 로그인 실패:', error);
-      });
-  }, [dispatch, navigate]);
-
-  // 구글 로그인 처리 (팝업 → 실패 시 리다이렉트 방식으로 fallback)
+  // 구글 로그인 처리 (팝업 → 차단 시 리다이렉트 fallback)
   const handleGoogleLogin = async () => {
     try {
-      // 팝업 방식 먼저 시도
-      const result = await signInWithPopup(auth, googleProvider);
-      const firebaseUser = result.user;
-      dispatch(
-        setUser({
-          uid: firebaseUser.uid,
-          displayName: firebaseUser.displayName,
-          email: firebaseUser.email,
-          photoURL: firebaseUser.photoURL,
-        })
-      );
-      navigate('/');
+      await signInWithPopup(auth, googleProvider);
+      // 성공 시 onAuthStateChanged → setUser → isLoggedIn = true → navigate('/')
     } catch (error) {
-      // 팝업 차단 시 리다이렉트 방식으로 전환
       if (
         error.code === 'auth/popup-blocked' ||
         error.code === 'auth/popup-closed-by-user' ||
         error.code === 'auth/cancelled-popup-request'
       ) {
-        console.warn('팝업 차단됨 → 리다이렉트 방식으로 전환');
+        // 팝업 차단 → 리다이렉트 방식으로 전환
         try {
           await signInWithRedirect(auth, googleProvider);
         } catch (redirectError) {
@@ -88,6 +50,17 @@ function LoginPage() {
       }
     }
   };
+
+  // Firebase 초기 인증 확인 중이면 로딩 표시
+  if (loading) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.card}>
+          <p style={{ color: '#6b7280' }}>인증 확인 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
